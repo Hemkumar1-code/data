@@ -119,8 +119,8 @@ const DataEntry: React.FC = () => {
     }, [user, activeBatchId]);
 
     const handleSizeChange = (size: string, value: string) => {
-        // Only allow numeric input
-        if (value && !/^\d*$/.test(value)) return;
+        // Allow digits and optional leading minus (-) only. Block plus (+) and other chars.
+        if (value && !/^-?\d*$/.test(value)) return;
 
         setCurrentRow(prev => ({
             ...prev,
@@ -352,21 +352,23 @@ const DataEntry: React.FC = () => {
                         </select>
                     </div>
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Net Weight (Kg)</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Gross Weight (Kg)
+                        </label>
                         <input
                             type="number"
                             step="0.001"
-                            value={netWeight}
+                            value={grossWeight}
                             onChange={(e) => {
-                                const net = parseFloat(e.target.value);
-                                setNetWeight(e.target.value);
-                                // Auto-calculate Gross = Net - deduction
+                                const gross = parseFloat(e.target.value);
+                                setGrossWeight(e.target.value);
+                                // Auto-calculate Net = Gross - deduction
                                 const selectedOpt = MEASUREMENT_OPTIONS.find(o => o.value === measurement);
-                                if (selectedOpt && !isNaN(net)) {
-                                    const gross = net - selectedOpt.deduction;
-                                    setGrossWeight(gross >= 0 ? gross.toFixed(3) : '0.000');
+                                if (selectedOpt && !isNaN(gross)) {
+                                    const net = gross - selectedOpt.deduction;
+                                    setNetWeight(net >= 0 ? net.toFixed(3) : '0.000');
                                 } else {
-                                    setGrossWeight('');
+                                    setNetWeight('');
                                 }
                             }}
                             placeholder="e.g. 10"
@@ -375,20 +377,20 @@ const DataEntry: React.FC = () => {
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Gross Weight (Kg)
+                            Net Weight (Kg)
                             {measurement && (
-                                <span className="ml-2 text-xs font-normal text-orange-600 bg-orange-50 px-1.5 py-0.5 rounded">
-                                    = Net − {MEASUREMENT_OPTIONS.find(o => o.value === measurement)?.deduction}
+                                <span className="ml-2 text-xs font-normal text-green-700 bg-green-50 px-1.5 py-0.5 rounded">
+                                    = Gross − {MEASUREMENT_OPTIONS.find(o => o.value === measurement)?.deduction}
                                 </span>
                             )}
                         </label>
                         <input
                             type="number"
                             step="0.001"
-                            value={grossWeight}
+                            value={netWeight}
                             readOnly
                             placeholder="Auto-calculated"
-                            className="input-field bg-orange-50 text-orange-800 cursor-not-allowed select-none"
+                            className="input-field bg-green-50 text-green-800 cursor-not-allowed select-none"
                         />
                     </div>
                 </div>
@@ -484,7 +486,13 @@ const DataEntry: React.FC = () => {
                                     <td key={size.id} className="p-2 text-center">
                                         <input
                                             type="text"
-                                            className={`w-12 px-1 py-1 border rounded text-center text-sm ${currentRow.sizes[size.label] ? 'border-blue-500 bg-blue-50' : 'border-gray-200'}`}
+                                            className={`w-12 px-1 py-1 border rounded text-center text-sm ${
+                                                currentRow.sizes[size.label]
+                                                    ? Number(currentRow.sizes[size.label]) < 0
+                                                        ? 'border-red-400 bg-red-50 text-red-700'
+                                                        : 'border-blue-500 bg-blue-50'
+                                                    : 'border-gray-200'
+                                            }`}
                                             value={currentRow.sizes[size.label] || ''}
                                             onChange={(e) => handleSizeChange(size.label, e.target.value)}
                                         />
