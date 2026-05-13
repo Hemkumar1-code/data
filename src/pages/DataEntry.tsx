@@ -47,11 +47,6 @@ const DataEntry: React.FC = () => {
     const [sizeList, setSizeList] = useState<SizeConfig[]>([]);
     const [editingRowId, setEditingRowId] = useState<string | null>(null);
 
-    // Password Modal State
-    const [showPasswordModal, setShowPasswordModal] = useState(false);
-    const [passwordInput, setPasswordInput] = useState('');
-    const [passwordError, setPasswordError] = useState(false);
-
     // Fetch Settings
     useEffect(() => {
         // Active Batch
@@ -222,25 +217,6 @@ const DataEntry: React.FC = () => {
         } catch (error) {
             console.error("Error saving row:", error);
             alert("Failed to save row. Check console.");
-        }
-    };
-
-    // Called when user clicks "Save & Finalize Carton"
-    const handleFinalizeClick = () => {
-        setPasswordInput('');
-        setPasswordError(false);
-        setShowPasswordModal(true);
-    };
-
-    // Called after password is confirmed
-    const handlePasswordConfirm = () => {
-        if (passwordInput === '1122') {
-            setShowPasswordModal(false);
-            setPasswordInput('');
-            setPasswordError(false);
-            handleSaveToExcel();
-        } else {
-            setPasswordError(true);
         }
     };
 
@@ -560,7 +536,7 @@ const DataEntry: React.FC = () => {
                             {editingRowId ? <Edit size={18} /> : <Plus size={18} />}
                             {editingRowId ? 'Update Row' : 'Save Row'}
                         </button>
-                        <button onClick={handleFinalizeClick} className="btn-primary flex items-center gap-2">
+                        <button onClick={handleSaveToExcel} className="btn-primary flex items-center gap-2">
                             <FileSpreadsheet size={18} /> Save & Finalize Carton
                         </button>
                     </div>
@@ -568,53 +544,6 @@ const DataEntry: React.FC = () => {
             </div>
         </div>
 
-        {/* Password Modal */}
-            {showPasswordModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-                    <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-sm mx-4 animate-fadeIn">
-                        <div className="flex flex-col items-center gap-4">
-                            <div className="w-14 h-14 rounded-full bg-blue-100 flex items-center justify-center">
-                                <svg xmlns="http://www.w3.org/2000/svg" className="w-7 h-7 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                                </svg>
-                            </div>
-                            <h2 className="text-xl font-bold text-gray-900">Enter Password</h2>
-                            <p className="text-sm text-gray-500 text-center">Password required to finalize and save the carton.</p>
-                            <input
-                                type="password"
-                                className={`w-full px-4 py-3 border-2 rounded-lg text-center text-xl tracking-widest font-mono focus:outline-none transition-colors ${
-                                    passwordError
-                                        ? 'border-red-400 bg-red-50 text-red-700 focus:border-red-500'
-                                        : 'border-gray-300 focus:border-blue-500'
-                                }`}
-                                placeholder="••••"
-                                value={passwordInput}
-                                onChange={(e) => { setPasswordInput(e.target.value); setPasswordError(false); }}
-                                onKeyDown={(e) => { if (e.key === 'Enter') handlePasswordConfirm(); }}
-                                autoFocus
-                                maxLength={10}
-                            />
-                            {passwordError && (
-                                <p className="text-sm text-red-600 font-medium">❌ Incorrect password. Try again.</p>
-                            )}
-                            <div className="flex gap-3 w-full mt-2">
-                                <button
-                                    onClick={() => { setShowPasswordModal(false); setPasswordInput(''); setPasswordError(false); }}
-                                    className="flex-1 px-4 py-2.5 rounded-lg border border-gray-300 text-gray-700 font-medium hover:bg-gray-50 transition-colors"
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    onClick={handlePasswordConfirm}
-                                    className="flex-1 px-4 py-2.5 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-colors"
-                                >
-                                    Confirm
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
         </>
     );
 };
