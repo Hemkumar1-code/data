@@ -122,28 +122,7 @@ export const generateExcel = async (cartons: Carton[], season: string) => {
 };
 
 
-// --- PACKING LIST GENERATOR (STRICT LAYOUT) ---
-
-const STRICT_SIZE_MAP: { [key: string]: number } = {
-    // Sizes to Column Index (A=0 ... D=3 ... AL=37)
-    // D=3, E=4, F=5, G=6, H=7, I=8, J=9, K=10, L=11, M=12, N=13, O=14, P=15, Q=16, R=17, S=18, T=19, U=20, V=21, W=22
-    "38": 3, "44": 4, "50": 5, "56": 6, "62": 7, "68": 8, "74": 9, "80": 10, "86": 11, "92": 12,
-    "98": 13, "104": 14, "110": 15, "116": 16, "122": 17, "128": 18, "134": 19, "140": 20, "146": 21, "152": 22,
-    // X=23, Y=24
-    "158": 23, "164": 24,
-    // Z=25 ... AH=33
-    "XXS": 25, "XS": 26, "S": 27, "M": 28, "L": 29, "XL": 30, "XXL": 31, "3XL": 32, "4XL": 33
-};
-
-// Column Indices (0-based)
-const COL_CTN_NO = 0;   // A
-const COL_STYLE = 1;    // B
-const COL_COLOUR = 2;   // C
-// D-AH are Sizes
-const COL_TOT_PCS = 34; // AI
-const COL_NT_WT = 35;   // AJ
-const COL_GR_WT = 36;   // AK
-const COL_CTN_DIMN = 37;// AL
+// --- PACKING LIST GENERATOR (DYNAMIC SIZE LAYOUT) ---
 
 // Helper to normalize store name (remove suffixes)
 const normalizeStoreName = (name: string) => {
@@ -156,7 +135,49 @@ export const generatePackingList = async (cartons: Carton[]) => {
     const XLSX = await import('xlsx');
     const wb = XLSX.utils.book_new();
 
-    // 1. Group by Base Store
+    // --- 1. DYNAMIC SIZE DISCOVERY AND SORTING ---
+    const allSizeKeys = new Set<string>();
+    cartons.forEach(carton => {
+        carton.rows.forEach(row => {
+            if (row.sizes) Object.keys(row.sizes).forEach(size => allSizeKeys.add(size));
+        });
+        if (carton.sizes) Object.keys(carton.sizes).forEach(size => allSizeKeys.add(size));
+    });
+
+    const sortedSizeList = Array.from(allSizeKeys).sort((a, b) => {
+        // Smart sort: split by slash to handle dual sizes like "50/56"
+        const getBaseNum = (str: string) => {
+            const parts = str.split('/');
+            return parseFloat(parts[0]);
+        };
+        const aNum = getBaseNum(a);
+        const bNum = getBaseNum(b);
+        const aIsNum = !isNaN(aNum);
+        const bIsNum = !isNaN(bNum);
+        
+        if (aIsNum && bIsNum) return aNum - bNum;
+        if (aIsNum) return -1;
+        if (bIsNum) return 1;
+        return a.localeCompare(b);
+    });
+
+    const DYNAMIC_SIZE_MAP: { [key: string]: number } = {};
+    let currentSizeCol = 3; // Starts at D
+    sortedSizeList.forEach(size => {
+        DYNAMIC_SIZE_MAP[size] = currentSizeCol++;
+    });
+
+    const COL_CTN_NO = 0;   // A
+    const COL_STYLE = 1;    // B
+    const COL_COLOUR = 2;   // C
+    // 3 to currentSizeCol-1 are Sizes
+    const COL_TOT_PCS = currentSizeCol; 
+    const COL_NT_WT = currentSizeCol + 1;   
+    const COL_GR_WT = currentSizeCol + 2;   
+    const COL_CTN_DIMN = currentSizeCol + 3;
+    const LAST_COL = currentSizeCol + 3;
+
+    // 2. Group by Base Store
     const baseStoreGroups: { [base: string]: { [variant: string]: Carton[] } } = {};
 
     cartons.forEach(c => {
@@ -175,7 +196,7 @@ export const generatePackingList = async (cartons: Carton[]) => {
 
         // Prepare Sheet Data Grid
         const wsData: any[][] = [];
-        for (let i = 0; i < 200; i++) wsData.push(new Array(40).fill(""));
+        for (let i = 0; i < 200; i++) wsData.push(new Array(LAST_COL + 5).fill(""));
 
         // --- HEADERS (FIXED) ---
         // A1:AL1 Merged PACKING LIST (Index 0, Col 0-37)
@@ -245,7 +266,7 @@ export const generatePackingList = async (cartons: Carton[]) => {
         wsData[headerRowIdx][COL_STYLE] = "STYLE";
         wsData[headerRowIdx][COL_COLOUR] = "COLOUR";
 
-        Object.entries(STRICT_SIZE_MAP).forEach(([label, colIdx]) => {
+        Object.entries(DYNAMIC_SIZE_MAP).forEach(([label, colIdx]) => {
             wsData[headerRowIdx][colIdx] = label;
         });
 
@@ -271,7 +292,7 @@ export const generatePackingList = async (cartons: Carton[]) => {
                 // Insert spacer row?
                 currentRowIdx++;
                 // Ensure buffer
-                if (!wsData[currentRowIdx]) wsData.push(new Array(40).fill(""));
+                if (!wsData[currentRowIdx]) wsData.push(new Array(LAST_COL + 5).fill(""));
                 // Insert Store Header
                 wsData[currentRowIdx][0] = `STORE NAME : ${variantName}`;
                 // Increment idx to start data
@@ -281,7 +302,7 @@ export const generatePackingList = async (cartons: Carton[]) => {
             // Data
             variantCartons.forEach(carton => {
                 const uniqueRows = carton.rows;
-                while (wsData.length <= currentRowIdx + uniqueRows.length + 5) wsData.push(new Array(40).fill(""));
+                while (wsData.length <= currentRowIdx + uniqueRows.length + 5) wsData.push(new Array(LAST_COL + 5).fill(""));
 
                 if (uniqueRows.length === 0) {
                     wsData[currentRowIdx][COL_CTN_NO] = globalCtnCounter++;
@@ -301,7 +322,7 @@ export const generatePackingList = async (cartons: Carton[]) => {
                         if (r.sizes) {
                             Object.entries(r.sizes).forEach(([sizeKey, val]) => {
                                 let num = Number(val);
-                                const colIdx = STRICT_SIZE_MAP[sizeKey];
+                                const colIdx = DYNAMIC_SIZE_MAP[sizeKey];
                                 if (colIdx && !isNaN(num) && num > 0) {
                                     wsData[currentRowIdx][colIdx] = num;
                                 }
@@ -326,7 +347,7 @@ export const generatePackingList = async (cartons: Carton[]) => {
 
         // --- MERGES ---
         const merges: any[] = [
-            { s: { r: 0, c: 0 }, e: { r: 0, c: 37 } }, // A1:AL1 Packing List
+            { s: { r: 0, c: 0 }, e: { r: 0, c: LAST_COL } }, // A1 to Last Col Packing List
             // Exporter Address No Merge
             { s: { r: 2, c: 8 }, e: { r: 6, c: 9 } },  // I3:J7 Fabric
             { s: { r: 2, c: 11 }, e: { r: 2, c: 12 } }, // L3:M3
@@ -336,7 +357,7 @@ export const generatePackingList = async (cartons: Carton[]) => {
             { s: { r: 6, c: 11 }, e: { r: 6, c: 12 } }, // L7:M7
             { s: { r: 8, c: 10 }, e: { r: 8, c: 12 } }, // K9:M9 DIMN
             // Store Name Row 10 (Index 9)
-            { s: { r: 9, c: 0 }, e: { r: 9, c: 37 } }, // A10:AL10
+            { s: { r: 9, c: 0 }, e: { r: 9, c: LAST_COL } }, // A10:LastCol
         ];
 
         // Dynamic Merges for Sub-Store Headers
@@ -345,7 +366,7 @@ export const generatePackingList = async (cartons: Carton[]) => {
             // Just add merges for any row starting with "STORE NAME :"
             // Note: Row 9 is already added above. 
             if (idx !== 9 && row[0] && String(row[0]).startsWith("STORE NAME :")) {
-                merges.push({ s: { r: idx, c: 0 }, e: { r: idx, c: 37 } });
+                merges.push({ s: { r: idx, c: 0 }, e: { r: idx, c: LAST_COL } });
             }
         });
 
@@ -356,7 +377,7 @@ export const generatePackingList = async (cartons: Carton[]) => {
         wscols[COL_CTN_NO] = { wch: 8 };
         wscols[COL_STYLE] = { wch: 15 };
         wscols[COL_COLOUR] = { wch: 15 };
-        for (let c = 3; c <= 33; c++) wscols[c] = { wch: 4 }; // Sizes D-AH
+        for (let c = 3; c < currentSizeCol; c++) wscols[c] = { wch: 4 }; // Sizes D to dynamic
         wscols[COL_TOT_PCS] = { wch: 8 };
         wscols[COL_NT_WT] = { wch: 8 };
         wscols[COL_GR_WT] = { wch: 8 };

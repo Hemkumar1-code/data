@@ -37,7 +37,7 @@ const Header: React.FC = () => {
 
                     <div className="h-8 w-px bg-gray-200 mx-2 hidden sm:block"></div>
 
-                    {/* Admin Navigation Controls */}
+
                     {(user.role === 'admin' ||
                         ['hemk3672@gmail.com', 'rojes@gmail.com'].includes((user.email || '').toLowerCase())) && (
                             <div className="flex items-center gap-2">

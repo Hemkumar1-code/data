@@ -31,7 +31,11 @@ const AdminPanel: React.FC = () => {
     const [sizeList, setSizeList] = useState<SizeConfig[]>([]);
     const [newSizeLabel, setNewSizeLabel] = useState('');
     const [newSizeType, setNewSizeType] = useState<'numeric' | 'alpha'>('numeric');
-    const [newSizeOrder, setNewSizeOrder] = useState<number>(0);
+
+    // Password Modal State
+    const [showPasswordModal, setShowPasswordModal] = useState(false);
+    const [passwordInput, setPasswordInput] = useState('');
+    const [passwordError, setPasswordError] = useState(false);
 
     // 1. Fetch Settings (Season, Batch, Dropdowns)
     useEffect(() => {
@@ -86,15 +90,18 @@ const AdminPanel: React.FC = () => {
                 if (snap.exists()) {
                     const data = snap.data();
                     const list = (data.list || []) as SizeConfig[];
-                    // Sort by order
-                    list.sort((a, b) => a.order - b.order);
+                    // Smart sort: numeric sizes by value, alpha sizes after numerics
+                    list.sort((a, b) => {
+                        const aNum = parseFloat(a.label);
+                        const bNum = parseFloat(b.label);
+                        const aIsNum = !isNaN(aNum);
+                        const bIsNum = !isNaN(bNum);
+                        if (aIsNum && bIsNum) return aNum - bNum;
+                        if (aIsNum) return -1; // numerics before alphas
+                        if (bIsNum) return 1;
+                        return a.order - b.order; // alpha sizes keep their order
+                    });
                     setSizeList(list);
-                    // Determine next order
-                    if (list.length > 0) {
-                        setNewSizeOrder(Math.max(...list.map(s => s.order)) + 10);
-                    } else {
-                        setNewSizeOrder(10);
-                    }
                 } else {
                     // Seed initial empty or default? user prompt says "Users cannot add... All new entries must persist".
                     // Let's seed with empty list to initialize doc
@@ -145,6 +152,20 @@ const AdminPanel: React.FC = () => {
         }
     };
 
+    // Calculate smart order for a new size label
+    const calcSmartOrder = (label: string): number => {
+        const num = parseFloat(label);
+        if (!isNaN(num)) {
+            // Numeric size: order = numeric value * 10 (e.g. 47 → 470, 52 → 520)
+            return num * 10;
+        } else {
+            // Alpha size: comes after all numeric sizes
+            // Use 100000 + current alpha count * 10
+            const alphaCount = sizeList.filter(s => isNaN(parseFloat(s.label))).length;
+            return 100000 + alphaCount * 10;
+        }
+    };
+
     const handleAddSizeConfig = async () => {
         if (!newSizeLabel.trim()) return;
         // Check duplicate
@@ -155,18 +176,18 @@ const AdminPanel: React.FC = () => {
 
         try {
             const sizeRef = doc(db, 'settings', 'sizes');
+            const smartOrder = calcSmartOrder(newSizeLabel.trim());
             const newSize: SizeConfig = {
                 id: `SIZE_${Date.now()}`,
                 label: newSizeLabel.trim(),
                 type: newSizeType,
-                order: Number(newSizeOrder)
+                order: smartOrder
             };
             const newList = [...sizeList, newSize];
             await updateDoc(sizeRef, { list: newList });
 
             setNewSizeLabel('');
-            setNewSizeOrder(prev => prev + 10);
-            alert("Size added successfully");
+            alert(`Size "${newSizeLabel.trim()}" added successfully!`);
         } catch (e) {
             console.error("Error adding size:", e);
             alert("Failed to add size");
@@ -219,8 +240,25 @@ const AdminPanel: React.FC = () => {
         }
     };
 
-    const handleNewExcelSheet = async () => {
+    const handleNewExcelClick = () => {
         if (user?.role !== 'admin') return;
+        setPasswordInput('');
+        setPasswordError(false);
+        setShowPasswordModal(true);
+    };
+
+    const handlePasswordConfirm = () => {
+        if (passwordInput === '1122') {
+            setShowPasswordModal(false);
+            setPasswordInput('');
+            setPasswordError(false);
+            processNewExcelSheet();
+        } else {
+            setPasswordError(true);
+        }
+    };
+
+    const processNewExcelSheet = async () => {
         if (!confirm("Are you sure you want to create a NEW EXCEL SHEET?\n\nThis will finalize the current file and start a fresh list. Old entries will be hidden from this view.")) return;
 
         try {
@@ -371,7 +409,7 @@ const AdminPanel: React.FC = () => {
                     {user?.role === 'admin' && (
                         <>
                             <button
-                                onClick={handleNewExcelSheet}
+                                onClick={handleNewExcelClick}
                                 className="btn-primary flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white border-none"
                                 title="Create New Excel File (Starts fresh list)"
                             >
@@ -529,20 +567,24 @@ const AdminPanel: React.FC = () => {
 
                 <div className="flex flex-wrap gap-4 items-end mb-6 bg-gray-50 p-4 rounded-lg border border-gray-100">
                     <div>
-                        <label className="text-xs font-medium text-gray-600 block mb-1">Label</label>
+                        <label className="text-xs font-medium text-gray-600 block mb-1">Size Label</label>
                         <input
                             type="text"
-                            placeholder="e.g. 38, S"
+                            placeholder="e.g. 52, XL"
                             className="input-field w-32"
                             value={newSizeLabel}
-                            onChange={(e) => setNewSizeLabel(e.target.value)}
+                            onChange={(e) => {
+                                setNewSizeLabel(e.target.value);
+                                // Auto-detect type
+                                setNewSizeType(isNaN(parseFloat(e.target.value.trim())) ? 'alpha' : 'numeric');
+                            }}
+                            onKeyDown={(e) => e.key === 'Enter' && handleAddSizeConfig()}
                         />
                     </div>
-                    {/* ... (rest of manage sizes controls already here or below) ... */}
                     <div>
-                        <label className="text-xs font-medium text-gray-600 block mb-1">Type</label>
+                        <label className="text-xs font-medium text-gray-600 block mb-1">Type (Auto)</label>
                         <select
-                            className="input-field w-32"
+                            className="input-field w-28"
                             value={newSizeType}
                             onChange={(e) => setNewSizeType(e.target.value as 'numeric' | 'alpha')}
                         >
@@ -550,21 +592,15 @@ const AdminPanel: React.FC = () => {
                             <option value="alpha">Alpha</option>
                         </select>
                     </div>
-                    <div>
-                        <label className="text-xs font-medium text-gray-600 block mb-1">Order</label>
-                        <input
-                            type="number"
-                            className="input-field w-20"
-                            value={newSizeOrder}
-                            onChange={(e) => setNewSizeOrder(Number(e.target.value))}
-                        />
+                    <div className="flex flex-col justify-end">
+                        <p className="text-xs text-gray-400 mb-1">Auto-sorted by value</p>
+                        <button
+                            onClick={handleAddSizeConfig}
+                            className="btn-primary"
+                        >
+                            <Plus size={16} className="inline mr-1" /> Add Size
+                        </button>
                     </div>
-                    <button
-                        onClick={handleAddSizeConfig}
-                        className="btn-primary mb-[2px]"
-                    >
-                        <Plus size={16} className="inline mr-1" /> Add Size
-                    </button>
                 </div>
 
                 <div className="flex flex-wrap gap-2">
@@ -729,6 +765,54 @@ const AdminPanel: React.FC = () => {
                     </div>
                 )
             }
+
+            {/* Password Modal */}
+            {showPasswordModal && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm">
+                    <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-sm mx-4 animate-fadeIn">
+                        <div className="flex flex-col items-center gap-4">
+                            <div className="w-14 h-14 rounded-full bg-red-100 flex items-center justify-center">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="w-7 h-7 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                                </svg>
+                            </div>
+                            <h2 className="text-xl font-bold text-gray-900">Enter Password</h2>
+                            <p className="text-sm text-gray-500 text-center">Password required to start a new Excel sheet.</p>
+                            <input
+                                type="password"
+                                className={`w-full px-4 py-3 border-2 rounded-lg text-center text-xl tracking-widest font-mono focus:outline-none transition-colors ${
+                                    passwordError
+                                        ? 'border-red-400 bg-red-50 text-red-700 focus:border-red-500'
+                                        : 'border-gray-300 focus:border-red-500'
+                                }`}
+                                placeholder="••••"
+                                value={passwordInput}
+                                onChange={(e) => { setPasswordInput(e.target.value); setPasswordError(false); }}
+                                onKeyDown={(e) => { if (e.key === 'Enter') handlePasswordConfirm(); }}
+                                autoFocus
+                                maxLength={10}
+                            />
+                            {passwordError && (
+                                <p className="text-sm text-red-600 font-medium">❌ Incorrect password. Try again.</p>
+                            )}
+                            <div className="flex gap-3 w-full mt-2">
+                                <button
+                                    onClick={() => { setShowPasswordModal(false); setPasswordInput(''); setPasswordError(false); }}
+                                    className="flex-1 px-4 py-2.5 rounded-lg border border-gray-300 text-gray-700 font-medium hover:bg-gray-50 transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={handlePasswordConfirm}
+                                    className="flex-1 px-4 py-2.5 rounded-lg bg-red-600 text-white font-semibold hover:bg-red-700 transition-colors"
+                                >
+                                    Confirm
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div >
     );
 };
