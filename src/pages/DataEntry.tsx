@@ -43,6 +43,7 @@ const DataEntry: React.FC = () => {
     const [savedRows, setSavedRows] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [activeBatchId, setActiveBatchId] = useState<string>('');
+    const [globalSeason, setGlobalSeason] = useState<string>('');
     const [dropdowns, setDropdowns] = useState<{ prints: string[], styles: string[], stores: string[] }>({ prints: [], styles: [], stores: [] });
     const [sizeList, setSizeList] = useState<SizeConfig[]>([]);
     const [editingRowId, setEditingRowId] = useState<string | null>(null);
@@ -53,9 +54,12 @@ const DataEntry: React.FC = () => {
         const settingsRef = doc(db, 'settings', 'general');
         const unsubSettings = onSnapshot(settingsRef, (snap) => {
             if (snap.exists()) {
-                setActiveBatchId(snap.data().activeBatchId || 'BATCH_INITIAL');
+                const data = snap.data();
+                setActiveBatchId(data.activeBatchId || 'BATCH_INITIAL');
+                setGlobalSeason(data.season || '');
             } else {
                 setActiveBatchId('BATCH_INITIAL');
+                setGlobalSeason('');
             }
         });
 
@@ -246,7 +250,7 @@ const DataEntry: React.FC = () => {
             batch.set(cartonRef, {
                 buyer,
                 storeName,
-                season: 'WINTER 2025',
+                season: globalSeason,
                 netWeight: Number(netWeight),
                 grossWeight: Number(grossWeight),
                 measurement,
