@@ -5,6 +5,7 @@ import { collection, query, orderBy, onSnapshot, doc, setDoc, getDocs, updateDoc
 import type { Carton, CartonRow, SizeConfig } from '../types';
 import { generatePackingList, generateCartonSheet } from '../utils/excelGenerator';
 import { Layers, Package, Settings as SettingsIcon, Edit, X, Plus, FileSpreadsheet, Trash2 } from 'lucide-react';
+import EditCartonModal from '../components/EditCartonModal';
 
 const AdminPanel: React.FC = () => {
     const { user } = useAuth();
@@ -694,77 +695,12 @@ const AdminPanel: React.FC = () => {
             </div>
 
             {/* Edit Modal */}
-            {
-                editingCarton && (
-                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                        <div className="bg-white rounded-xl shadow-xl max-w-md w-full overflow-hidden">
-                            <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
-                                <h3 className="font-bold text-lg text-gray-900">Edit Carton #{editingCarton.index || ''}</h3>
-                                <button onClick={() => setEditingCarton(null)} className="text-gray-500 hover:text-gray-700">
-                                    <X size={20} />
-                                </button>
-                            </div>
-
-                            <div className="p-6 space-y-6">
-                                {/* Update Season */}
-                                <div className="bg-blue-50/50 p-4 rounded-lg border border-blue-100">
-                                    <h4 className="text-sm font-semibold text-blue-900 mb-3">Change Season</h4>
-                                    <div className="flex gap-2">
-                                        <input
-                                            type="text"
-                                            className="input-field text-sm"
-                                            placeholder="Season Name"
-                                            value={newSeason}
-                                            onChange={(e) => setNewSeason(e.target.value)}
-                                        />
-                                        <button
-                                            onClick={handleUpdateSeason}
-                                            className="btn-primary text-sm whitespace-nowrap px-3"
-                                        >
-                                            Update
-                                        </button>
-                                    </div>
-                                </div>
-
-                                {/* Add Size */}
-                                <div className="bg-green-50/50 p-4 rounded-lg border border-green-100">
-                                    <h4 className="text-sm font-semibold text-green-900 mb-3">Add Size</h4>
-                                    <div className="space-y-3">
-                                        <div className="grid grid-cols-2 gap-3">
-                                            <div>
-                                                <label className="text-xs font-medium text-gray-600 block mb-1">Size</label>
-                                                <input
-                                                    type="text"
-                                                    className="input-field text-sm"
-                                                    placeholder="e.g. XL"
-                                                    value={newSizeName}
-                                                    onChange={(e) => setNewSizeName(e.target.value)}
-                                                />
-                                            </div>
-                                            <div>
-                                                <label className="text-xs font-medium text-gray-600 block mb-1">Quantity</label>
-                                                <input
-                                                    type="number"
-                                                    className="input-field text-sm"
-                                                    placeholder="Qty"
-                                                    value={newSizeQty}
-                                                    onChange={(e) => setNewSizeQty(e.target.value)}
-                                                />
-                                            </div>
-                                        </div>
-                                        <button
-                                            onClick={handleAddSize}
-                                            className="w-full btn-secondary text-sm flex items-center justify-center gap-2 hover:bg-green-50 hover:border-green-200 hover:text-green-700"
-                                        >
-                                            <Plus size={16} /> Add Size
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                )
-            }
+            {editingCarton && (
+                <EditCartonModal 
+                    carton={editingCarton} 
+                    onClose={() => setEditingCarton(null)} 
+                />
+            )}
 
             {/* Password Modal */}
             {showPasswordModal && (
