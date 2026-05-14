@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
-import { collection, query, orderBy, onSnapshot, doc, setDoc, getDocs, updateDoc, increment, where, writeBatch } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, doc, setDoc, getDocs, updateDoc, where, writeBatch } from 'firebase/firestore';
 import type { Carton, CartonRow, SizeConfig } from '../types';
 import { generatePackingList, generateCartonSheet } from '../utils/excelGenerator';
 import { Layers, Package, Settings as SettingsIcon, Edit, X, Plus, FileSpreadsheet, Trash2 } from 'lucide-react';
@@ -19,9 +19,6 @@ const AdminPanel: React.FC = () => {
 
     // Edit Modal State
     const [editingCarton, setEditingCarton] = useState<Carton | null>(null);
-    const [newSizeName, setNewSizeName] = useState('');
-    const [newSizeQty, setNewSizeQty] = useState('');
-    const [newSeason, setNewSeason] = useState('');
 
     // Dynamic Dropdowns State
     const [dropdowns, setDropdowns] = useState<{ prints: string[], styles: string[], stores: string[] }>({ prints: [], styles: [], stores: [] });
@@ -332,19 +329,6 @@ const AdminPanel: React.FC = () => {
         }
     };
 
-    const handleUpdateSeason = async () => {
-        if (!editingCarton || !newSeason) return;
-        try {
-            const cartonRef = doc(db, 'cartons', editingCarton.id);
-            await updateDoc(cartonRef, { season: newSeason });
-            alert(`Season updated to ${newSeason}`);
-            setEditingCarton({ ...editingCarton, season: newSeason }); // Optimistic update
-        } catch (e) {
-            console.error("Error updating season:", e);
-            alert("Failed to update season");
-        }
-    };
-
     const handleDeleteCarton = async (cartonId: string) => {
         if (!confirm("Are you sure you want to delete this carton? This cannot be undone.")) return;
         try {
@@ -368,32 +352,6 @@ const AdminPanel: React.FC = () => {
             alert("Failed to delete carton");
         } finally {
             setLoading(false);
-        }
-    };
-
-    const handleAddSize = async () => {
-        if (!editingCarton || !newSizeName || !newSizeQty) return;
-        const qty = Number(newSizeQty);
-        if (isNaN(qty) || qty <= 0) {
-            alert("Invalid quantity");
-            return;
-        }
-
-        try {
-            // User Request: "Automatic Action in Firestore: Adds the size to the sizes map in the cartons document."
-            // We use updateDoc on the carton directly.
-            const cartonRef = doc(db, 'cartons', editingCarton.id);
-            await updateDoc(cartonRef, {
-                [`sizes.${newSizeName}`]: increment(qty), // Add or increment size
-                totalPcs: increment(qty)
-            });
-
-            alert(`Size ${newSizeName} added with ${qty} pcs`);
-            setNewSizeName('');
-            setNewSizeQty('');
-        } catch (e) {
-            console.error("Error adding size:", e);
-            alert("Failed to add size");
         }
     };
 
@@ -667,9 +625,6 @@ const AdminPanel: React.FC = () => {
                                                     <button
                                                         onClick={() => {
                                                             setEditingCarton(carton);
-                                                            setNewSeason(carton.season || '');
-                                                            setNewSizeName('');
-                                                            setNewSizeQty('');
                                                         }}
                                                         className="p-1 hover:bg-gray-100 rounded text-blue-600 transition-colors"
                                                         title="Edit Carton"
