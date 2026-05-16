@@ -32,7 +32,7 @@ interface EditCartonModalProps {
 const EditCartonModal: React.FC<EditCartonModalProps> = ({ carton, onClose }) => {
     const { user } = useAuth();
     
-    // Global Carton Details
+
     const [buyer, setBuyer] = useState(carton.buyer || BUYER_OPTIONS[0]);
     const [storeName, setStoreName] = useState(carton.storeName || '');
     const [season, setSeason] = useState(carton.season || '');
@@ -40,17 +40,17 @@ const EditCartonModal: React.FC<EditCartonModalProps> = ({ carton, onClose }) =>
     const [grossWeight, setGrossWeight] = useState(carton.grossWeight !== undefined ? String(carton.grossWeight) : '');
     const [measurement, setMeasurement] = useState(carton.measurement || '');
 
-    // Current input row
+
     const [currentRow, setCurrentRow] = useState<RowInput>(INITIAL_ROW_STATE);
 
-    // Fetched saved rows for the current carton
+
     const [savedRows, setSavedRows] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [dropdowns, setDropdowns] = useState<{ prints: string[], styles: string[], stores: string[] }>({ prints: [], styles: [], stores: [] });
     const [sizeList, setSizeList] = useState<SizeConfig[]>([]);
     const [editingRowId, setEditingRowId] = useState<string | null>(null);
 
-    // Fetch Settings (Dropdowns & Sizes)
+
     useEffect(() => {
         const dropRef = doc(db, 'settings', 'dropdowns');
         const unsubDrops = onSnapshot(dropRef, (snap) => {
@@ -89,7 +89,7 @@ const EditCartonModal: React.FC<EditCartonModalProps> = ({ carton, onClose }) =>
         };
     }, []);
 
-    // Load rows for this carton
+
     useEffect(() => {
         if (!carton.id) return;
 
@@ -100,7 +100,7 @@ const EditCartonModal: React.FC<EditCartonModalProps> = ({ carton, onClose }) =>
 
         const unsubscribe = onSnapshot(q, (snapshot) => {
             const rows = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            // Sort rows by createdAt manually as index might not exist if they don't have createdAt, but they usually do
+           
             rows.sort((a: any, b: any) => {
                 const aTime = a.createdAt?.seconds || 0;
                 const bTime = b.createdAt?.seconds || 0;
@@ -162,7 +162,7 @@ const EditCartonModal: React.FC<EditCartonModalProps> = ({ carton, onClose }) =>
                 totalPcs: total,
                 buyer,
                 storeName,
-                cartonId: carton.id, // Assigned to this carton immediately
+                cartonId: carton.id,
                 batchId: carton.batchId || null,
             };
 
@@ -204,10 +204,10 @@ const EditCartonModal: React.FC<EditCartonModalProps> = ({ carton, onClose }) =>
         }
 
         try {
-            // Recalculate total pieces for the whole carton
+
             const newTotalPcs = savedRows.reduce((sum, row) => sum + (row.totalPcs || 0), 0);
             
-            // Also add any admin-added sizes if they exist
+
             let adminSizesTotal = 0;
             if (carton.sizes) {
                 adminSizesTotal = Object.values(carton.sizes).reduce((sum, val) => sum + Number(val), 0);
@@ -227,7 +227,7 @@ const EditCartonModal: React.FC<EditCartonModalProps> = ({ carton, onClose }) =>
                 updatedAt: serverTimestamp()
             });
 
-            // Update buyer & storeName for all existing rows just in case they changed
+
             for (const row of savedRows) {
                 await updateDoc(doc(db, 'carton_rows', row.id), {
                     buyer,
@@ -246,8 +246,8 @@ const EditCartonModal: React.FC<EditCartonModalProps> = ({ carton, onClose }) =>
     return (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 sm:p-6 overflow-y-auto">
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-6xl max-h-[95vh] flex flex-col my-auto overflow-hidden animate-fadeIn">
-                
-                {/* Header */}
+ 
+
                 <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-gray-50 shrink-0">
                     <div>
                         <h2 className="font-bold text-xl text-gray-900 flex items-center gap-2">
@@ -261,10 +261,10 @@ const EditCartonModal: React.FC<EditCartonModalProps> = ({ carton, onClose }) =>
                     </button>
                 </div>
 
-                {/* Content */}
+
                 <div className="p-6 overflow-y-auto space-y-6 flex-1">
                     
-                    {/* Top Details */}
+
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                         <div>
                             <label className="block text-sm font-semibold text-gray-700 mb-2">Season <span className="text-red-500">*</span></label>
@@ -300,7 +300,7 @@ const EditCartonModal: React.FC<EditCartonModalProps> = ({ carton, onClose }) =>
                         </div>
                     </div>
 
-                    {/* Weight & Measurement */}
+
                     <div className="bg-blue-50/30 p-5 rounded-xl border border-blue-100">
                         <h3 className="text-sm font-semibold text-blue-900 uppercase tracking-wider mb-4">Carton Dimensions & Weight</h3>
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
@@ -352,7 +352,7 @@ const EditCartonModal: React.FC<EditCartonModalProps> = ({ carton, onClose }) =>
                         </div>
                     </div>
 
-                    {/* Entry Table for Rows */}
+
                     <div className="border border-gray-200 rounded-xl overflow-hidden shadow-sm">
                         <div className="bg-gray-50 px-4 py-3 border-b border-gray-200 flex justify-between items-center">
                             <h3 className="font-semibold text-gray-800">Carton Contents</h3>
@@ -378,7 +378,7 @@ const EditCartonModal: React.FC<EditCartonModalProps> = ({ carton, onClose }) =>
                                         <tr><td colSpan={(sizeList.length || 10) + 4} className="p-8 text-center text-gray-500">Loading rows...</td></tr>
                                     )}
 
-                                    {/* Saved Rows */}
+
                                     {savedRows.map(row => (
                                         <tr key={row.id} className="hover:bg-gray-50/50 transition-colors">
                                             <td className="table-cell sticky left-0 bg-white shadow-[1px_0_0_0_#e5e7eb] font-medium text-gray-700">{row.print}</td>
@@ -418,28 +418,45 @@ const EditCartonModal: React.FC<EditCartonModalProps> = ({ carton, onClose }) =>
                                             <select
                                                 className="w-full px-2 py-1.5 border border-blue-200 rounded text-sm bg-white"
                                                 value={currentRow.style}
-                                                onChange={(e) => setCurrentRow(prev => ({ ...prev, style: e.target.value }))}
+                                                onChange={(e) => {
+                                                    const newStyle = e.target.value;
+                                                    setCurrentRow(prev => {
+                                                        const doubleStyles = ['baggy pants', 'baggy pant', 'pants', 'pant', 'short pants', 'short pant', 'terry short pants', 'terry short pant'];
+                                                        const isOldDouble = prev.style ? doubleStyles.includes(prev.style.toLowerCase().trim()) : false;
+                                                        const isNewDouble = newStyle ? doubleStyles.includes(newStyle.toLowerCase().trim()) : false;
+                                                        return { ...prev, style: newStyle, sizes: isOldDouble !== isNewDouble ? {} : prev.sizes };
+                                                    });
+                                                }}
                                             >
                                                 <option value="">Select</option>
                                                 {dropdowns.styles.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                                             </select>
                                         </td>
-                                        {sizeList.map(size => (
-                                            <td key={size.id} className="p-2 text-center">
-                                                <input
-                                                    type="text"
-                                                    className={`w-12 px-1 py-1.5 border rounded text-center text-sm focus:ring-1 focus:ring-blue-500 outline-none ${
-                                                        currentRow.sizes[size.label]
-                                                            ? Number(currentRow.sizes[size.label]) < 0
-                                                                ? 'border-red-400 bg-red-50 text-red-700'
-                                                                : 'border-blue-400 bg-blue-50 text-blue-900'
-                                                            : 'border-gray-200 bg-white'
-                                                    }`}
-                                                    value={currentRow.sizes[size.label] || ''}
-                                                    onChange={(e) => handleSizeChange(size.label, e.target.value)}
-                                                />
-                                            </td>
-                                        ))}
+                                        {sizeList.map(size => {
+                                            const doubleStyles = ['baggy pants', 'baggy pant', 'pants', 'pant', 'short pants', 'short pant', 'terry short pants', 'terry short pant'];
+                                            const isDoubleSizeStyle = currentRow.style ? doubleStyles.includes(currentRow.style.toLowerCase().trim()) : false;
+                                            const isDoubleSize = size.label.includes('/');
+                                            const isDisabled = currentRow.style ? (isDoubleSizeStyle ? !isDoubleSize : isDoubleSize) : false;
+                                            
+                                            return (
+                                                <td key={size.id} className="p-2 text-center">
+                                                    <input
+                                                        type="text"
+                                                        disabled={isDisabled}
+                                                        className={`w-12 px-1 py-1.5 border rounded text-center text-sm focus:ring-1 focus:ring-blue-500 outline-none ${
+                                                            isDisabled ? 'bg-gray-100 opacity-50 cursor-not-allowed border-gray-200' : 
+                                                            currentRow.sizes[size.label]
+                                                                ? Number(currentRow.sizes[size.label]) < 0
+                                                                    ? 'border-red-400 bg-red-50 text-red-700'
+                                                                    : 'border-blue-400 bg-blue-50 text-blue-900'
+                                                                : 'border-gray-200 bg-white'
+                                                        }`}
+                                                        value={currentRow.sizes[size.label] || ''}
+                                                        onChange={(e) => handleSizeChange(size.label, e.target.value)}
+                                                    />
+                                                </td>
+                                            );
+                                        })}
                                         <td className="p-2 text-right font-bold text-blue-700">
                                             {calculateTotalPcs(currentRow.sizes)}
                                         </td>

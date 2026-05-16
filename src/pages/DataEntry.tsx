@@ -489,7 +489,15 @@ const DataEntry: React.FC = () => {
                                     <select
                                         className="w-24 px-2 py-1 border border-gray-300 rounded text-sm"
                                         value={currentRow.style}
-                                        onChange={(e) => setCurrentRow(prev => ({ ...prev, style: e.target.value }))}
+                                        onChange={(e) => {
+                                            const newStyle = e.target.value;
+                                            setCurrentRow(prev => {
+                                                const doubleStyles = ['baggy pants', 'baggy pant', 'pants', 'pant', 'short pants', 'short pant', 'terry short pants', 'terry short pant'];
+                                                const isOldDouble = prev.style ? doubleStyles.includes(prev.style.toLowerCase().trim()) : false;
+                                                const isNewDouble = newStyle ? doubleStyles.includes(newStyle.toLowerCase().trim()) : false;
+                                                return { ...prev, style: newStyle, sizes: isOldDouble !== isNewDouble ? {} : prev.sizes };
+                                            });
+                                        }}
                                     >
                                         <option value="">Select</option>
                                         {dropdowns.styles.map(opt => (
@@ -497,21 +505,31 @@ const DataEntry: React.FC = () => {
                                         ))}
                                     </select>
                                 </td>
-                                {sizeList.map(size => (
-                                    <td key={size.id} className="p-2 text-center">
-                                        <input
-                                            type="text"
-                                            className={`w-12 px-1 py-1 border rounded text-center text-sm ${currentRow.sizes[size.label]
-                                                    ? Number(currentRow.sizes[size.label]) < 0
-                                                        ? 'border-red-400 bg-red-50 text-red-700'
-                                                        : 'border-blue-500 bg-blue-50'
-                                                    : 'border-gray-200'
+                                {sizeList.map(size => {
+                                    const doubleStyles = ['baggy pants', 'baggy pant', 'pants', 'pant', 'short pants', 'short pant', 'terry short pants', 'terry short pant'];
+                                    const isDoubleSizeStyle = currentRow.style ? doubleStyles.includes(currentRow.style.toLowerCase().trim()) : false;
+                                    const isDoubleSize = size.label.includes('/');
+                                    const isDisabled = currentRow.style ? (isDoubleSizeStyle ? !isDoubleSize : isDoubleSize) : false;
+
+                                    return (
+                                        <td key={size.id} className="p-2 text-center">
+                                            <input
+                                                type="text"
+                                                disabled={isDisabled}
+                                                className={`w-12 px-1 py-1 border rounded text-center text-sm ${
+                                                    isDisabled ? 'bg-gray-100 opacity-50 cursor-not-allowed border-gray-200' :
+                                                    currentRow.sizes[size.label]
+                                                        ? Number(currentRow.sizes[size.label]) < 0
+                                                            ? 'border-red-400 bg-red-50 text-red-700'
+                                                            : 'border-blue-500 bg-blue-50'
+                                                        : 'border-gray-200'
                                                 }`}
-                                            value={currentRow.sizes[size.label] || ''}
-                                            onChange={(e) => handleSizeChange(size.label, e.target.value)}
-                                        />
-                                    </td>
-                                ))}
+                                                value={currentRow.sizes[size.label] || ''}
+                                                onChange={(e) => handleSizeChange(size.label, e.target.value)}
+                                            />
+                                        </td>
+                                    );
+                                })}
                                 <td className="p-2 text-right font-bold text-blue-600">
                                     {calculateTotalPcs(currentRow.sizes)}
                                 </td>
