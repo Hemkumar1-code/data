@@ -6,6 +6,7 @@ import type { Carton, CartonRow, SizeConfig } from '../types';
 import { generatePackingList, generateCartonSheet } from '../utils/excelGenerator';
 import { Layers, Package, Settings as SettingsIcon, Edit, X, Plus, FileSpreadsheet, Trash2 } from 'lucide-react';
 import EditCartonModal from '../components/EditCartonModal';
+import StoreTargetsAnalytics from '../components/StoreTargetsAnalytics';
 
 const AdminPanel: React.FC = () => {
     const { user } = useAuth();
@@ -454,6 +455,9 @@ const AdminPanel: React.FC = () => {
                     />
                 </div>
             </div>
+
+            {/* Store Targets & Analytics */}
+            <StoreTargetsAnalytics cartons={cartons} />
 
             {/* Manage Dropdowns */}
             <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">

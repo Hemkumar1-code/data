@@ -278,7 +278,7 @@ const DataEntry: React.FC = () => {
             // So Save to Excel probably keeps them? I'll keep them for efficiency.
 
             setSavedRows([]); // Local state clears (snapshot will verify)
-            alert("Carton Finalized Successfully!");
+            // Removed alert so user only clicks OK once on the confirm popup
 
         } catch (error) {
             console.error("Error finalizing carton:", error);
@@ -472,7 +472,15 @@ const DataEntry: React.FC = () => {
                             ))}
 
                             {/* Input Row */}
-                            <tr className={`bg-blue-50/10 ${editingRowId ? 'ring-2 ring-blue-400' : ''}`}>
+                            <tr 
+                                className={`bg-blue-50/10 ${editingRowId ? 'ring-2 ring-blue-400' : ''}`}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                        e.preventDefault();
+                                        handleSaveRow();
+                                    }
+                                }}
+                            >
                                 <td className="p-2 sticky left-0 bg-white z-10 shadow-r">
                                     <select
                                         className="w-24 px-2 py-1 border border-gray-300 rounded text-sm"
