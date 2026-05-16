@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { collection, query, orderBy, onSnapshot, doc, setDoc, getDocs, updateDoc, where, writeBatch } from 'firebase/firestore';
 import type { Carton, CartonRow, SizeConfig } from '../types';
 import { generatePackingList, generateCartonSheet } from '../utils/excelGenerator';
-import { Layers, Package, Settings as SettingsIcon, Edit, X, Plus, FileSpreadsheet, Trash2 } from 'lucide-react';
+import { Layers, Package, Settings as SettingsIcon, Edit, X, Plus, FileSpreadsheet, Trash2, Undo2 } from 'lucide-react';
 import EditCartonModal from '../components/EditCartonModal';
 import StoreTargetsAnalytics from '../components/StoreTargetsAnalytics';
 
@@ -17,6 +17,8 @@ const AdminPanel: React.FC = () => {
     const [tempSeason, setTempSeason] = useState('');
     const [loading, setLoading] = useState(true);
     const [generating, setGenerating] = useState(false);
+    const [lastDeleted, setLastDeleted] = useState<{ carton: any, rows: any[] } | null>(null);
+    const [showUndo, setShowUndo] = useState(false);
 
     // Edit Modal State
     const [editingCarton, setEditingCarton] = useState<Carton | null>(null);
@@ -151,15 +153,13 @@ const AdminPanel: React.FC = () => {
         }
     };
 
-    // Calculate smart order for a new size label
     const calcSmartOrder = (label: string): number => {
         const num = parseFloat(label);
         if (!isNaN(num)) {
-            // Numeric size: order = numeric value * 10 (e.g. 47 → 470, 52 → 520)
+
             return num * 10;
         } else {
-            // Alpha size: comes after all numeric sizes
-            // Use 100000 + current alpha count * 10
+
             const alphaCount = sizeList.filter(s => isNaN(parseFloat(s.label))).length;
             return 100000 + alphaCount * 10;
         }
@@ -167,7 +167,8 @@ const AdminPanel: React.FC = () => {
 
     const handleAddSizeConfig = async () => {
         if (!newSizeLabel.trim()) return;
-        // Check duplicate
+
+
         if (sizeList.some(s => s.label.toLowerCase() === newSizeLabel.trim().toLowerCase())) {
             alert("Size label already exists!");
             return;
@@ -205,9 +206,9 @@ const AdminPanel: React.FC = () => {
         }
     };
 
-    // 2. Fetch Cartons Real-time (Scoped by Batch)
+
     useEffect(() => {
-        if (!activeBatchId) return; // Wait for settings
+        if (!activeBatchId) return;
 
         const q = query(
             collection(db, 'cartons'),
@@ -264,10 +265,10 @@ const AdminPanel: React.FC = () => {
             setGenerating(true);
             const newBatchId = `BATCH_${Date.now()}`;
 
-            // Update Global Settings
+
             await setDoc(doc(db, 'settings', 'general'), { activeBatchId: newBatchId }, { merge: true });
 
-            // Update Local State immediately to reflect change (cartons will empty out due to query change)
+
             setActiveBatchId(newBatchId);
 
             alert(`New Excel file created successfully.\nBatch ID: ${newBatchId}\n\nAll new entries will go to this file.`);
@@ -284,7 +285,7 @@ const AdminPanel: React.FC = () => {
     const handleDownloadPackingList = async () => {
         try {
             setGenerating(true);
-            // Same logic: filter rows by active cartons
+
             const cartonIds = new Set(cartons.map(c => c.id));
             const rowsSnapshot = await getDocs(query(collection(db, 'carton_rows')));
 
@@ -331,26 +332,74 @@ const AdminPanel: React.FC = () => {
     };
 
     const handleDeleteCarton = async (cartonId: string) => {
-        if (!confirm("Are you sure you want to delete this carton? This cannot be undone.")) return;
+        const cartonToDelete = cartons.find(c => c.id === cartonId);
+        if (!cartonToDelete) return;
+
+        if (!confirm(`Delete Carton #${cartonToDelete.cartonNumber}? You can undo this for a few seconds.`)) return;
+
         try {
             setLoading(true);
-            const batch = writeBatch(db);
 
-            // Delete Carton Doc
-            batch.delete(doc(db, 'cartons', cartonId));
-
-            // Delete Associated Rows
+            // 1. Fetch all rows before deleting
             const rowsQuery = query(collection(db, 'carton_rows'), where('cartonId', '==', cartonId));
             const rowsSnap = await getDocs(rowsQuery);
+            const rowsData = rowsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+            // 2. Save to backup for Undo
+            setLastDeleted({
+                carton: { ...cartonToDelete },
+                rows: rowsData
+            });
+
+            const batch = writeBatch(db);
+
+            // 3. Delete Carton Doc
+            batch.delete(doc(db, 'cartons', cartonId));
+
+            // 4. Delete Associated Rows
             rowsSnap.forEach(rowDoc => {
                 batch.delete(rowDoc.ref);
             });
 
             await batch.commit();
-            alert("Carton deleted successfully");
+            
+            // 5. Show Undo banner
+            setShowUndo(true);
+            setTimeout(() => setShowUndo(false), 8000); // Hide after 8 seconds
         } catch (e) {
             console.error("Error deleting carton:", e);
             alert("Failed to delete carton");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleUndoDelete = async () => {
+        if (!lastDeleted) return;
+
+        try {
+            setLoading(true);
+            const batch = writeBatch(db);
+
+            // 1. Restore Carton
+            const cartonRef = doc(db, 'cartons', lastDeleted.carton.id);
+            const { id, ...cartonData } = lastDeleted.carton;
+            batch.set(cartonRef, cartonData);
+
+            // 2. Restore Rows
+            lastDeleted.rows.forEach(row => {
+                const rowRef = doc(db, 'carton_rows', row.id);
+                const { id, ...rowData } = row;
+                batch.set(rowRef, rowData);
+            });
+
+            await batch.commit();
+            setLastDeleted(null);
+            setShowUndo(false);
+            alert("Carton restored successfully!");
+        } catch (e) {
+            console.error("Error restoring carton:", e);
+            alert("Failed to restore carton.");
         } finally {
             setLoading(false);
         }
@@ -504,9 +553,8 @@ const AdminPanel: React.FC = () => {
 
                 <div className="flex flex-wrap gap-2 max-h-40 overflow-y-auto p-2 bg-gray-50 rounded border border-gray-100">
                     {(optionType === 'print' ? dropdowns.prints : optionType === 'style' ? dropdowns.styles : (dropdowns.stores || [])).map(opt => (
-                        <div key={opt} className={`bg-white px-3 py-1 rounded-full border text-sm flex items-center gap-2 group ${
-                            optionType === 'store' ? 'border-green-200 text-green-800' : 'border-gray-200'
-                        }`}>
+                        <div key={opt} className={`bg-white px-3 py-1 rounded-full border text-sm flex items-center gap-2 group ${optionType === 'store' ? 'border-green-200 text-green-800' : 'border-gray-200'
+                            }`}>
                             {opt}
                             {user?.role === 'admin' && (
                                 <button
@@ -655,9 +703,9 @@ const AdminPanel: React.FC = () => {
 
             {/* Edit Modal */}
             {editingCarton && (
-                <EditCartonModal 
-                    carton={editingCarton} 
-                    onClose={() => setEditingCarton(null)} 
+                <EditCartonModal
+                    carton={editingCarton}
+                    onClose={() => setEditingCarton(null)}
                 />
             )}
 
@@ -675,11 +723,10 @@ const AdminPanel: React.FC = () => {
                             <p className="text-sm text-gray-500 text-center">Password required to start a new Excel sheet.</p>
                             <input
                                 type="password"
-                                className={`w-full px-4 py-3 border-2 rounded-lg text-center text-xl tracking-widest font-mono focus:outline-none transition-colors ${
-                                    passwordError
+                                className={`w-full px-4 py-3 border-2 rounded-lg text-center text-xl tracking-widest font-mono focus:outline-none transition-colors ${passwordError
                                         ? 'border-red-400 bg-red-50 text-red-700 focus:border-red-500'
                                         : 'border-gray-300 focus:border-red-500'
-                                }`}
+                                    }`}
                                 placeholder="••••"
                                 value={passwordInput}
                                 onChange={(e) => { setPasswordInput(e.target.value); setPasswordError(false); }}
@@ -708,7 +755,33 @@ const AdminPanel: React.FC = () => {
                     </div>
                 </div>
             )}
-        </div >
+        </div>
+
+        {/* Undo Banner */}
+        {showUndo && (
+            <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-bottom-4 duration-300">
+                <div className="bg-gray-900 text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-6 border border-gray-800">
+                    <div className="flex flex-col">
+                        <span className="text-sm font-medium text-gray-400">Carton Deleted</span>
+                        <span className="text-xs text-gray-500">Deleted Carton #{lastDeleted?.carton?.cartonNumber}</span>
+                    </div>
+                    <div className="h-8 w-[1px] bg-gray-800"></div>
+                    <button
+                        onClick={handleUndoDelete}
+                        className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-xl transition-all font-bold text-sm"
+                    >
+                        <Undo2 size={16} />
+                        UNDO
+                    </button>
+                    <button 
+                        onClick={() => setShowUndo(false)}
+                        className="text-gray-400 hover:text-white transition-colors"
+                    >
+                        <X size={18} />
+                    </button>
+                </div>
+            </div>
+        )}
     );
 };
 
