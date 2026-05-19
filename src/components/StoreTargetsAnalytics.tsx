@@ -119,11 +119,14 @@ const StoreTargetsAnalytics: React.FC<StoreTargetsAnalyticsProps> = ({ cartons }
         }
     };
 
-    // Calculate aggregated packed quantities
+    // Normalize store name: remove ALL spaces + uppercase so "LITTLE LUNA A" and "LITTLELUNA A" both match
+    const normalizeName = (name: string) => name.trim().replace(/\s+/g, '').toUpperCase();
+
+    // Calculate aggregated packed quantities (keyed by NORMALIZED store name)
     const packedQuantities = useMemo(() => {
         const map: Record<string, number> = {};
         cartons.forEach(c => {
-            const store = c.storeName.trim();
+            const store = normalizeName(c.storeName);
             map[store] = (map[store] || 0) + (c.totalPcs || 0);
         });
         return map;
@@ -133,7 +136,8 @@ const StoreTargetsAnalytics: React.FC<StoreTargetsAnalyticsProps> = ({ cartons }
     const chartData = useMemo(() => {
         if (selectedStore === 'OVERALL') {
             const totalTarget = targets.reduce((sum, t) => sum + t.targetQty, 0);
-            const totalPacked = targets.reduce((sum, t) => sum + (packedQuantities[t.storeName] || 0), 0);
+            // ✅ Sum ALL packed pieces from all cartons
+            const totalPacked = Object.values(packedQuantities).reduce((sum, qty) => sum + qty, 0);
 
             if (totalTarget === 0) return [];
 
@@ -152,11 +156,12 @@ const StoreTargetsAnalytics: React.FC<StoreTargetsAnalyticsProps> = ({ cartons }
                 { name: 'Pending', value: pending, color: '#E5E7EB' }
             ];
         } else {
-            const target = targets.find(t => t.storeName === selectedStore);
+            const target = targets.find(t => normalizeName(t.storeName) === normalizeName(selectedStore));
             if (!target) return [];
 
             const targetQty = target.targetQty;
-            const packed = packedQuantities[selectedStore] || 0;
+            // ✅ Lookup using normalized name to handle space differences
+            const packed = packedQuantities[normalizeName(selectedStore)] || 0;
             const pending = Math.max(0, targetQty - packed);
             const overPacked = Math.max(0, packed - targetQty);
 
@@ -278,7 +283,8 @@ const StoreTargetsAnalytics: React.FC<StoreTargetsAnalyticsProps> = ({ cartons }
                         <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
                             {selectedStore === 'OVERALL' ? (() => {
                                 const totalTarget = targets.reduce((sum, t) => sum + t.targetQty, 0);
-                                const totalPacked = targets.reduce((sum, t) => sum + (packedQuantities[t.storeName] || 0), 0);
+                                // ✅ Sum ALL packed pieces from all cartons
+                                const totalPacked = Object.values(packedQuantities).reduce((sum, qty) => sum + qty, 0);
                                 return (
                                     <div className="space-y-4">
                                         <div className="flex justify-between items-center pb-3 border-b border-gray-200">
@@ -300,10 +306,11 @@ const StoreTargetsAnalytics: React.FC<StoreTargetsAnalyticsProps> = ({ cartons }
                                     </div>
                                 );
                             })() : (() => {
-                                const target = targets.find(t => t.storeName === selectedStore);
+                                const target = targets.find(t => normalizeName(t.storeName) === normalizeName(selectedStore));
                                 if (!target) return null;
                                 const targetQty = target.targetQty;
-                                const packed = packedQuantities[selectedStore] || 0;
+                                // ✅ Lookup using normalized name to handle space differences
+                                const packed = packedQuantities[normalizeName(selectedStore)] || 0;
                                 return (
                                     <div className="space-y-4">
                                         <div className="flex justify-between items-center pb-3 border-b border-gray-200">
